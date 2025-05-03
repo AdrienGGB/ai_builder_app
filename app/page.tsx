@@ -1,9 +1,15 @@
 // Mark this component as a Client Component because it uses hooks and handles user interaction
 "use client";
 
-import { useState, FormEvent } from 'react';
-// Assuming you'll add a component for authentication later
-// import Auth from '../components/Auth';
+// Mark this component as a Client Component because it uses hooks and handles user interaction
+"use client";
+
+import { useState, useEffect, FormEvent } from 'react';
+import { supabase } from '@/lib/supabase'; // Import your Supabase client
+import { User } from '@supabase/supabase-js';
+import { useRouter } from 'next/navigation';
+
+import Auth from '@/components/Auth'; // Import the Auth component
 import PromptForm from '@/components/PromptForm';
 import WebsitePreview from '@/components/WebsitePreview';
 
@@ -20,45 +26,71 @@ export default function HomePage() {
   const [aiResponse, setAiResponse] = useState<AiResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // You might need user state if authentication is implemented here
-  // const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null); // State to hold the authenticated user
+  const [isAuthenticating, setIsAuthenticating] = useState(true); // State to track initial authentication check
+  const router = useRouter();
+
+  useEffect(() => {
+    async function getUser() {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      setIsAuthenticating(false);
+    }
+
+    getUser();
+
+    // Subscribe to auth state changes (optional, but good for real-time updates)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      setIsAuthenticating(false);
+    });
+
+    // Cleanup subscription on component unmount
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, []); // Run only on mount and unmount
 
   const handlePromptSubmit = async (promptText: string) => {
     setLoading(true);
     setError(null);
     setAiResponse(null); // Clear previous response
 
+    if (!user) {
+      setError('You must be logged in to generate a website.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      // TODO: Implement the call to your Supabase Edge Function here
-      // Example using fetch:
-      // const response = await fetch('/api/generate-website', { // Or directly to Edge Function URL
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     // Include Authorization header if your Edge Function requires authentication
-      //     // 'Authorization': `Bearer ${await supabase.auth.getSession()}` // Example
-      //   },
-      //   body: JSON.stringify({ prompt: promptText }),
-      // });
+      // TODO: Replace with the actual URL of your deployed Supabase Edge Function
+      // This URL is typically like https://<project-ref>.supabase.co/functions/v1/generate-website
+      const edgeFunctionUrl = 'YOUR_SUPABASE_EDGE_FUNCTION_URL'; // *** IMPORTANT: Replace with your actual URL ***
 
-      // if (!response.ok) {
-      //   throw new Error(`Error: ${response.statusText}`);
-      // }
+      const { data: { session } } = await supabase.auth.getSession();
 
-      // const data = await response.json();
-      // setAiResponse(data as AiResponse);
+      if (!session) {
+         setError('No active Supabase session found.');
+         setLoading(false);
+         return;
+      }
 
-      // --- Placeholder for demonstration ---
-      // Simulate fetching data from the backend/AI
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
-      const simulatedResponse: AiResponse = {
-        suggested_structure: "Homepage, About Us, Menu, Contact",
-        welcome_message: "Welcome to our vegan restaurant!",
-        sections: ["Hero Section", "About Us", "Menu Highlights", "Testimonials", "Contact Form", "Location Map"],
-        raw_output: "This is a raw text output from the AI."
-      };
-      setAiResponse(simulatedResponse);
-      // --- End Placeholder ---
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}` // Include the auth token
+        },
+        body: JSON.stringify({ prompt: promptText }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text(); // Read error response body
+        throw new Error(`Error: ${response.status} - ${errorBody}`);
+      }
+
+      const data: AiResponse = await response.json();
+      setAiResponse(data);
 
     } catch (err: any) {
       console.error("Failed to fetch AI response:", err);
@@ -68,21 +100,37 @@ export default function HomePage() {
     }
   };
 
+  // Show a loading indicator while checking authentication status
+  if (isAuthenticating) {
+    return <div className="container mx-auto p-4">Loading authentication...</div>;
+  }
+
   return (
     <div className="container mx-auto p-4">
       {/* Conditional rendering based on authentication status */}
-      {/* {!user ? (
-        <Auth setUser={setUser} /> // Assuming Auth component handles sign up/in
-      ) : ( */}
+      {!user ? (
+        <Auth /> // Render Auth component if no user is logged in
+      ) : (
         <>
+           {/* Display user's email or other info if needed */}
+          <p className="text-sm text-gray-600 mb-4">Logged in as: {user.email}</p>
+
           <h1 className="text-2xl font-bold mb-4">Generate Your Website</h1>
           <PromptForm onSubmit={handlePromptSubmit} loading={loading} />
 
           {loading && <p>Generating...</p>}
           {error && <p className="text-red-500">Error: {error}</p>}
           {aiResponse && <WebsitePreview response={aiResponse} />}
+
+          {/* Optional: Add a Sign Out button */}
+           <button
+            onClick={async () => { await supabase.auth.signOut(); router.push('/login'); }} // Redirect to login after sign out
+            className="mt-4 bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400"
+          >
+            Sign Out
+          </button>
         </>
-      {/* )} */}
+      )}
     </div>
   );
 }
