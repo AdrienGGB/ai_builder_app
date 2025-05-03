@@ -27,21 +27,65 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null); // State to hold the authenticated user
+  const [userRole, setUserRole] = useState<string | null>(null); // State to hold the user's role
   const [isAuthenticating, setIsAuthenticating] = useState(true); // State to track initial authentication check
   const router = useRouter();
 
   useEffect(() => {
-    async function getUser() {
+    async function fetchUserAndRole() {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+
+      if (user) {
+        // Fetch user's role from the 'users' table
+        const { data: roleData, error: roleError } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle(); // Use maybeSingle to handle 0 or 1 row
+
+        if (roleError) {
+          console.error("Error fetching user role:", roleError);
+          setUserRole(null);
+        } else if (roleData) {
+          setUserRole(roleData.role);
+        } else {
+          setUserRole(null); // User exists in auth but not in 'users' table, or no role set
+        }
+      } else {
+        setUserRole(null);
+      }
+
       setIsAuthenticating(false);
     }
 
-    getUser();
+    fetchUserAndRole();
 
-    // Subscribe to auth state changes (optional, but good for real-time updates)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
+    // Subscribe to auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+
+      if (currentUser) {
+         // Refetch role on auth state change if user is logged in
+         const { data: roleData, error: roleError } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', currentUser.id)
+            .maybeSingle();
+
+          if (roleError) {
+            console.error("Error fetching user role on auth state change:", roleError);
+            setUserRole(null);
+          } else if (roleData) {
+            setUserRole(roleData.role);
+          } else {
+             setUserRole(null);
+          }
+      } else {
+         setUserRole(null);
+      }
+
       setIsAuthenticating(false);
     });
 
