@@ -1,4 +1,4 @@
-// Mark this component as a Client Component
+// Added commit message to git add .
 "use client";
 
 import { useState } from 'react';
@@ -98,7 +98,7 @@ export default function Auth() {
             onClick={() => setIsSignUp(!isSignUp)}
             disabled={loading}
           >
-            {isSignUp ? 'Already have an account? Sign In' : 'Don't have an account? Sign Up'}
+            {isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up"}
           </button>
         </div>
       </div>
