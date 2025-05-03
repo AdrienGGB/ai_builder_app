@@ -25,15 +25,17 @@ export default function Auth() {
       .from('users')
       .select('role')
       .eq('email', email)
-      .single();
+      .maybeSingle(); // Use maybeSingle instead of single
 
-    if (roleError) {
+    // Handle the case where the user might not be in the 'users' table
+    if (roleError && roleError.code !== 'PGRST116') { // PGRST116 means no rows found
+      console.error("Error checking user role:", roleError);
       setError('Error checking user role: ' + roleError.message);
       setLoading(false);
       return;
     }
 
-    const isAdmin = userRoleData?.role === 'admin';
+    const isAdmin = roleError?.code !== 'PGRST116' && userRoleData?.role === 'admin';
 
     let data, authError;
 
