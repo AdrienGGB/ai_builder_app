@@ -20,8 +20,7 @@
     ],
     "baseUrl": ".",           // Add this line
     "paths": {
-      "@/*": ["./*"],
-      "@/lib/*": ["./src/lib/*"] // Add this line
+      "@/*": ["./src/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
