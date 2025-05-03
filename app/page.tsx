@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import Auth from '@/components/Auth'; // Import the Auth component
 import PromptForm from '@/components/PromptForm';
 import WebsitePreview from '@/components/WebsitePreview';
+import SettingsButton from '@/components/SettingsButton'; // Import the SettingsButton component
 
 interface AiResponse {
   // Define the structure of your expected AI response
@@ -156,8 +157,11 @@ export default function HomePage() {
         <Auth /> // Render Auth component if no user is logged in
       ) : (
         <>
-           {/* Display user's email or other info if needed */}
-          <p className="text-sm text-gray-600 mb-4">Logged in as: {user.email}</p>
+          {/* Display user's email and settings button */}
+          <div className="flex justify-between items-center w-full mb-4">
+             <p className="text-sm text-gray-600">Logged in as: {user.email}</p>
+             <SettingsButton /> {/* Add the SettingsButton component */}
+          </div>
 
           <h1 className="text-2xl font-bold mb-4">Generate Your Website</h1>
           <PromptForm onSubmit={handlePromptSubmit} loading={loading} />
