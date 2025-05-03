@@ -1,8 +1,8 @@
-// Added commit message to git add .
+// Mark this component as a Client Component
 "use client";
 
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase'; // Import your Supabase client
+import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 export default function Auth() {
@@ -20,22 +20,48 @@ export default function Auth() {
     setError(null);
     setMessage(null);
 
-    const { data, error } = isSignUp
-      ? await supabase.auth.signUp({ email, password })
-      : await supabase.auth.signInWithPassword({ email, password });
+    // 1. Check if the user has the "admin" role
+    const { data: userRoleData, error: roleError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('email', email)
+      .single();
 
-    if (error) {
-      setError(error.message);
-    } else if (data.user) {
-      setMessage(isSignUp ? 'Sign up successful. Please check your email to confirm.' : 'Sign in successful.');
-      // Optionally redirect after successful sign in
-      if (!isSignUp) {
-         // Redirect to the homepage or another protected page
+    if (roleError) {
+      setError('Error checking user role: ' + roleError.message);
+      setLoading(false);
+      return;
+    }
+
+    const isAdmin = userRoleData?.role === 'admin';
+
+    let data, authError;
+
+    if (isSignUp) {
+      // 2. Handle sign-up
+      ({ data, error: authError } = await supabase.auth.signUp({ email, password }));
+    } else if (isAdmin) {
+      // 3. Bypass password for admins via magic link
+      ({ data, error: authError } = await supabase.auth.signInWithOtp({ email }));
+      setMessage('Magic link sent to admin email. Please check your inbox.');
+    } else {
+      // 4. Normal password sign-in
+      ({ data, error: authError } = await supabase.auth.signInWithPassword({ email, password }));
+    }
+
+    if (authError) {
+      setError(authError.message);
+    } else if (data?.user || isAdmin) {
+      setMessage(isSignUp
+        ? 'Sign up successful. Please check your email to confirm.'
+        : isAdmin
+          ? 'Magic link sent to your admin email.'
+          : 'Sign in successful.');
+      if (!isSignUp && !isAdmin) {
         router.push('/');
       }
     } else {
-      // This case might happen for sign-up if email confirmation is required
-       setMessage('Please check your email for a confirmation link.');
+      setMessage('Please check your email for a confirmation link.');
     }
 
     setLoading(false);
@@ -63,21 +89,23 @@ export default function Auth() {
               disabled={loading}
             />
           </div>
-          <div>
-            <label htmlFor="password" className="sr-only">Password</label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-            />
-          </div>
+          {!isSignUp && (
+            <div>
+              <label htmlFor="password" className="sr-only">Password</label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+          )}
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
           {message && <p className="text-green-500 text-sm">{message}</p>}
