@@ -1,6 +1,37 @@
 import Image from "next/image";
+import { supabase } from '@/lib/supabase'
+import { useEffect, useState } from 'react';
+
+interface DataItem {
+  id: string; // Assuming your data has an 'id' field; adjust the type if needed
+  [key: string]: any; // Allow for other properties
+}
 
 export default function Home() {
+  const [data, setData] = useState<DataItem[] | null>(null); // Correctly type the data
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const { data: fetchedData, error } = await supabase
+          .from('your_table_name') // Replace with your table name
+          .select('*');
+
+        if (error) {
+          throw error;
+        }
+        setData(fetchedData as DataItem[] | null); // Type assertion to fix typing issue
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, []);
+
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
@@ -24,7 +55,19 @@ export default function Home() {
             Save and see your changes instantly.
           </li>
         </ol>
-
+         {loading ? (
+          <p>Loading...</p>
+        ) : (
+          data && data.length > 0 ? (
+            <ul>
+              {data.map((item) => (
+                <li key={item.id}>{JSON.stringify(item)}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>No data found.</p>
+          )
+        )}
         <div className="flex gap-4 items-center flex-col sm:flex-row">
           <a
             className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
