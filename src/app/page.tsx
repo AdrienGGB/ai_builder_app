@@ -1,9 +1,6 @@
 // Mark this component as a Client Component because it uses hooks and handles user interaction
 "use client";
 
-// Mark this component as a Client Component because it uses hooks and handles user interaction
-"use client";
-
 import { useState, useEffect, FormEvent } from 'react';
 import { supabase } from '@/lib/supabase'; // Import your Supabase client
 import { User } from '@supabase/supabase-js';
