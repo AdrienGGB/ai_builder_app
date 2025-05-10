@@ -1,0 +1,45 @@
+# Supabase Project Configuration
+
+# This is the project reference allocated to your Supabase project.
+# Your Supabase project's API URL will be https://<PROJECT_ID>.supabase.co.
+# project_id = "your-project-id" # This is usually set when you run supabase link
+
+[api]
+  # Port to use for Supabase KPS local development services.
+  port = 54321
+  # Schemes to host on. Can be "http" or "https" (requires mkcert).
+  # schemes = ["http"]
+  # Fallback functions for API routes that are not found. Provided functions must return a Response.
+  # fallback = "_shared/fallback"
+  # Path to your custom health check function. Provided function must return a Response.
+  # health_check = "_shared/healthCheck"
+
+[db]
+  # Port to use for the local database.
+  port = 54322
+  # Use a Docker container to run an ARM-based image on Apple Silicon / M1 machines.
+  # use_arm_image = true
+  # Use an M1-optimised Docker image for the database. This flag is ignored on non-M1 machines.
+  # apple_silicon_arm_image = false
+  # Major version of Postgres to use for the local database.
+  major_version = 15
+
+[studio]
+  # Port to use for Supabase Studio.
+  port = 54323
+
+# Email testing server.
+[inbucket]
+  # Port to use for the email testing server.
+  port = 54324
+  # Use an M1-optimised Docker image for Inbucket. This flag is ignored on non-M1 machines.
+  # apple_silicon_arm_image = false
+
+[functions]
+  # Set this to the directory where your Edge Functions are located.
+  # It's relative to the `supabase` directory.
+  source = "edge-functions"
+
+  # If you want to automatically verify JWT for all functions, set this to true.
+  # You can override this on a per-function basis in the function's config.toml.
+  # verify_jwt = true

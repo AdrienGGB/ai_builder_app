@@ -1,120 +1,141 @@
 // supabase/edge-functions/generate-website/index.ts
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.43.4'; // Use the correct version
-import { OpenAI } from 'https://deno.land/x/openai@v4.48.0/mod.ts'; // Use the correct version for OpenRouter compatibility
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.43.4';
+import { OpenAI } from 'https://deno.land/x/openai@v4.48.0/mod.ts';
 
-// Initialize Supabase client for the Edge Function environment
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_ANON_KEY')!,
-  {
-    auth: {
-      apiHost: Deno.env.get('SUPABASE_URL'), // Required for Auth in Edge Functions
-      persistSession: false,
-    },
-  }
-);
+// Helper function to create a JSON response with CORS headers
+function createJsonResponse(body: any, status: number, additionalHeaders?: HeadersInit) {
+  const headers = new Headers({
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*', // Allow all origins (adjust for production)
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    ...additionalHeaders,
+  });
+  return new Response(JSON.stringify(body), { status, headers });
+}
 
-// Get the OpenRouter API key from Edge Function secrets
+// Check for required environment variables at startup
+const supabaseUrl = Deno.env.get('SUPABASE_URL');
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
 const openRouterApiKey = Deno.env.get('OPENROUTER_API_KEY');
 
+if (!supabaseUrl) {
+  throw new Error('Missing SUPABASE_URL environment variable');
+}
+if (!supabaseAnonKey) {
+  throw new Error('Missing SUPABASE_ANON_KEY environment variable');
+}
 if (!openRouterApiKey) {
   throw new Error('Missing OPENROUTER_API_KEY environment variable');
 }
 
-// Initialize OpenRouter client (OpenAI compatible API)
-// Base URL is set to OpenRouter's API endpoint
-const openai = new OpenAI({
-    apiKey: openRouterApiKey,
-    baseURL: "https://openrouter.ai/api/v1", // OpenRouter API endpoint
+// Initialize Supabase client
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    apiHost: supabaseUrl, // Required for Auth in Edge Functions
+    persistSession: false,
+  },
 });
 
+// Initialize OpenRouter client
+const openai = new OpenAI({
+  apiKey: openRouterApiKey,
+  baseURL: "https://openrouter.ai/api/v1",
+});
 
 serve(async (req) => {
-  if (req.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 });
+  // Handle OPTIONS preflight request for CORS
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: {
+      'Access-Control-Allow-Origin': '*', // Or your Vercel app's domain
+      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    } });
   }
 
+  if (req.method !== 'POST') {
+    return createJsonResponse({ error: 'Method Not Allowed' }, 405);
+  }
+
+  // Authentication
   const authHeader = req.headers.get('Authorization');
   const token = authHeader?.replace('Bearer ', '');
-
   if (!token) {
-    return new Response('Authentication required', { status: 401 });
+    return createJsonResponse({ error: 'Authentication required. No token provided.' }, 401);
   }
 
-  // Authenticate the user using the token
   const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
   if (authError || !user) {
     console.error("Authentication failed:", authError?.message);
-    return new Response('Authentication failed', { status: 401 });
+    return createJsonResponse({ error: `Authentication failed: ${authError?.message || 'Invalid token'}` }, 401);
+  }
+
+  // Process request body
+  let prompt;
+  try {
+    const body = await req.json();
+    prompt = body.prompt;
+    if (!prompt) {
+      return createJsonResponse({ error: 'Missing prompt in request body' }, 400);
+    }
+  } catch (e) {
+    console.error("Failed to parse request body:", e.message);
+    return createJsonResponse({ error: 'Invalid JSON in request body' }, 400);
   }
 
   try {
-    const { prompt } = await req.json();
-
-    if (!prompt) {
-      return new Response('Missing prompt in request body', { status: 400 });
-    }
-
-    // Call the AI model via OpenRouter
-    // Choose a suitable model available on OpenRouter
+    // Call AI model
     const aiCompletion = await openai.chat.completions.create({
-        model: "openai/gpt-4o-mini", // Example model, choose one from OpenRouter
-        messages: [
-            { role: "system", content: "You are an AI assistant that helps generate website structures and content ideas based on user descriptions. Provide a response in JSON format, including fields like 'suggested_structure', 'welcome_message', and 'sections'." },
-            { role: "user", content: prompt },
-        ],
-        response_format: { type: "json_object" }, // Request JSON output if the model supports it
+      model: "openai/gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are an AI assistant that helps generate website structures and content ideas based on user descriptions. Provide a response in JSON format, including fields like 'suggested_structure', 'welcome_message', and 'sections'." },
+        { role: "user", content: prompt },
+      ],
+      response_format: { type: "json_object" },
     });
 
-    const aiResponse = aiCompletion.choices[0].message.content;
-    let aiResponseJson: any = null;
-
-    try {
-      // Attempt to parse the AI response as JSON
-      aiResponseJson = JSON.parse(aiResponse || '{}');
-    } catch (parseError) {
-      console.error("Failed to parse AI response as JSON:", parseError);
-      // If parsing fails, store the raw response and indicate an error
-      aiResponseJson = { error: "Failed to parse AI JSON response", raw_output: aiResponse };
+    const aiResponseMessage = aiCompletion.choices[0]?.message?.content;
+    if (!aiResponseMessage) {
+        console.error("AI response message is empty or undefined");
+        return createJsonResponse({ error: 'AI did not return a message.' }, 500);
     }
 
+    let aiResponseJson: any;
+    try {
+      aiResponseJson = JSON.parse(aiResponseMessage);
+    } catch (parseError) {
+      console.error("Failed to parse AI response as JSON:", parseError.message);
+      aiResponseJson = { error: "Failed to parse AI JSON response", raw_output: aiResponseMessage };
+    }
 
-    // Store the prompt and AI response in the Supabase database
-    const { data, error: dbError } = await supabase
+    // Store prompt and AI response
+    const { data: dbData, error: dbError } = await supabase
       .from('prompts')
-      .insert([
-        {
-          user_id: user.id,
-          input_text: prompt,
-          ai_response: aiResponseJson, // Store the parsed (or raw) response
-        },
-      ])
-      .select() // Select the inserted row to get the generated ID
+      .insert([{ user_id: user.id, input_text: prompt, ai_response: aiResponseJson }])
+      .select()
       .single();
 
     if (dbError) {
       console.error("Failed to save prompt to DB:", dbError.message);
-      // You might still want to return the AI response even if saving to DB fails
-      return new Response(JSON.stringify(aiResponseJson), {
-        headers: { 'Content-Type': 'application/json' },
-        status: 500, // Indicate a server error occurred during saving
-      });
+      // Still return the AI response, but indicate DB save error to client if needed.
+      // For simplicity here, just returning the AI response with a success status,
+      // but client might see a discrepancy if it tries to fetch saved data later.
+      // Or, add a flag to aiResponseJson: e.g., aiResponseJson.db_save_error = true;
+      return createJsonResponse(aiResponseJson, 200); // Or 500 if DB save is critical for this step
     }
 
-    // Return the AI response to the frontend
-    return new Response(JSON.stringify(aiResponseJson), {
-      headers: { 'Content-Type': 'application/json' },
-      status: 200,
-    });
+    return createJsonResponse(dbData ? { ...aiResponseJson, prompt_id: dbData.id } : aiResponseJson, 200);
 
   } catch (error: any) {
-    console.error("Edge Function error:", error.message);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    console.error("Edge Function execution error:", error.message);
+    let errorMessage = 'An unexpected error occurred.';
+    if (error.response && error.response.data && error.response.data.error) {
+        errorMessage = error.response.data.error.message || errorMessage;
+    } else if (error.message) {
+        errorMessage = error.message;
+    }
+    return createJsonResponse({ error: errorMessage }, 500);
   }
 });

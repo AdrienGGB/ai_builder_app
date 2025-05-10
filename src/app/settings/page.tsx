@@ -4,6 +4,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { supabase } from '@/lib/supabase'; // Import your Supabase client 
 import { User } from '@supabase/supabase-js';
+import Link from 'next/link'; // Import Link for navigation
 
 interface ProjectSettings {
   id?: string; // Optional because it's generated on insert
@@ -136,6 +137,13 @@ export default function ProjectSettingsPage() {
 
   return (
     <div className="container mx-auto p-4">
+      <div className="mb-6">
+        <Link href="/">
+          <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50">
+            &larr; Back to Home
+          </button>
+        </Link>
+      </div>
       <h1 className="text-2xl font-bold mb-4">Project Settings</h1>
 
       {error && <p className="text-red-500 mb-4">Error: {error}</p>}
