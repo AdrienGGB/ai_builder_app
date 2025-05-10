@@ -11,13 +11,21 @@ import PromptForm from '@/components/PromptForm';
 import WebsitePreview from '@/components/WebsitePreview';
 import SettingsButton from '@/components/SettingsButton'; // Import the SettingsButton component
 
+// Define SectionDetail to match the one in WebsitePreview.tsx
+interface SectionDetail {
+  name: string;
+  description?: string;
+  content_ideas?: string[];
+  [key: string]: any;
+}
+
 interface AiResponse {
   // Define the structure of your expected AI response
-  // This is just a placeholder, adjust based on actual AI output
-  suggested_structure?: string;
+  // This should now match the AiResponse in WebsitePreview.tsx
+  suggested_structure?: string | object; // Can be string or object
   welcome_message?: string;
-  sections?: string[];
-  [key: string]: any; // Allow for other properties
+  sections?: SectionDetail[]; // Array of section objects
+  [key: string]: any; // Allow for other properties, including raw output
 }
 
 export default function HomePage() {
