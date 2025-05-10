@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, FormEvent } from 'react';
-import { supabase } from '@/lib/supabase'; // Import your Supabase client
+import { supabase } from '@/lib/supabase'; // Import your Supabase client 
 import { User } from '@supabase/supabase-js';
 
 interface ProjectSettings {
