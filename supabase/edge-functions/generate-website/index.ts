@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.43.4';
+import * as Supabase from 'https://esm.sh/@supabase/supabase-js@2.43.4';
 import { OpenAI } from 'https://deno.land/x/openai@v4.48.0/mod.ts';
 
 // Utility to return JSON response with CORS
@@ -24,7 +24,7 @@ if (!supabaseAnonKey) throw new Error('Missing SUPABASE_ANON_KEY environment var
 if (!openRouterApiKey) throw new Error('Missing OPENROUTER_API_KEY environment variable');
 
 // Supabase client
-const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+const supabase = Supabase.createClient(supabaseUrl, supabaseAnonKey, {
   auth: { apiHost: supabaseUrl, persistSession: false },
 });
 
