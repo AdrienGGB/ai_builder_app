@@ -107,7 +107,7 @@ export default function HomePage() {
     try {
       // TODO: Replace with the actual URL of your deployed Supabase Edge Function
       // This URL is typically like https://<project-ref>.supabase.co/functions/v1/generate-website
-      const edgeFunctionUrl = 'YOUR_SUPABASE_EDGE_FUNCTION_URL'; // *** IMPORTANT: Replace with your actual URL ***
+      const edgeFunctionUrl = 'https://bthqgsddceeajfhficlu.supabase.co/functions/v1/generate-website';
 
       const { data: { session } } = await supabase.auth.getSession();
 
